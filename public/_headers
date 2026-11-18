@@ -1,0 +1,9 @@
+# Security headers for Netlify. The app has no inline scripts, so script-src 'self' is safe.
+# 'unsafe-inline' for styles is required by React/Recharts inline style attributes.
+# connect-src 'self': the demo talks to no server at all — all data stays in IndexedDB.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=(), usb=()

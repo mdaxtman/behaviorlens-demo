@@ -1,0 +1,18 @@
+# Netlify build settings. Security headers live in public/_headers and the SPA fallback in
+# public/_redirects (both are copied into dist/ by Vite).
+# No environment variables are needed: the demo has no backend.
+# Tests gate the deploy: a failing test fails the build, and Netlify keeps the previous good
+# version live. (`npm run build` also fails on type errors via `tsc -b`.)
+[build]
+  command = "npm ci && npm test -- --run && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# The service worker must never be served stale, or users can be
+# pinned to an old version of the app after a deploy.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
