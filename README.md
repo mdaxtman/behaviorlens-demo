@@ -7,13 +7,41 @@ behavior data in two taps, then turns it into charts and IEP-ready writing promp
 Everything you add or change is stored in your browser only: there is no server, no login, and
 it works offline.
 
-## Why it exists
+**Contents:** [Purpose](#purpose) · [Goals](#goals) · [What it does](#what-it-does) ·
+[Tech](#tech) · [Portfolio notes](#portfolio-notes) · [Run it](#run-it)
 
-Students with IEPs often have behavior goals and, after a functional behavior assessment (FBA),
-a behavior intervention plan (BIP). The data behind both is usually tally marks on paper,
-transcribed later, if at all. BehaviorLens was built for a real classroom team to capture that
-data in the moment, on their phones, and get it back out in a form that's ready for the IEP
-meeting.
+## Purpose
+
+Students with IEPs (Individualized Education Programs) often have behavior goals. After a
+functional behavior assessment (FBA), many also have a behavior intervention plan (BIP). Both
+are only as good as the data behind them, and in most classrooms that data is tally marks on
+paper or a clipboard. It gets transcribed later, if at all, and then someone summarizes it by
+hand before every IEP meeting and progress report.
+
+The adults collecting that data are busy managing the behavior itself: a teacher and
+paraprofessionals moving between students all day. Anything slower than a glance and a tap
+doesn't get used.
+
+BehaviorLens was built for a real special education classroom team. It has two jobs:
+
+1. **Capture behavior data in the moment** on the phone already in an aide's pocket, fast
+   enough that recording never competes with the student.
+2. **Turn that data into the documents the team already has to write.** That means IEP present
+   levels, BIPs and parent progress reports, without retyping or hand-counting.
+
+## Goals
+
+These were the requirements the app was designed against:
+
+| Goal | How the app meets it |
+|------|----------------------|
+| Recording costs at most two taps | Home → student → one control per behavior; Undo instead of a confirmation dialog |
+| Works with no signal (gyms, playgrounds, buses) | Local-first. Every write lands on the device first, and the app installs as a PWA |
+| Collects the data an FBA actually needs | Count, duration and intensity, ABC chips (antecedent → consequence), and sessions with activity and setting |
+| Progress numbers are fair to the student | Goal rates average over days the student was actually observed, so absences and untracked days don't count against them |
+| Protects student privacy | Pseudonym codes instead of names; photos never leave the device; prompts use a `[Student]` placeholder |
+| Shortens the paperwork, not just the data entry | One-tap prompt packages with computed statistics, ready to paste into any LLM |
+| Usable by non-technical staff on their own phones | Mobile-first layout, labeled forms, large tap targets, deep links from a student straight to the right editor |
 
 ## What it does
 
@@ -69,6 +97,84 @@ The classroom version this demo comes from adds a backend:
 
 The demo removes the backend and keeps the same UI and domain code. The original design spec
 is in [`docs/design-spec.md`](docs/design-spec.md).
+
+## Portfolio notes
+
+### At a glance
+
+- **Problem:** Classroom behavior data is slow to collect and slower to use.
+- **Users:** A special education teacher and paraprofessionals, each recording on their own
+  phone during the school day.
+- **Role:** Product design, requirements gathering with the classroom team, and full-stack
+  development (built with AI pair-programming in Claude Code).
+- **Stack:** React, TypeScript, Vite, Tailwind, IndexedDB, Workbox PWA. The full version also
+  ran on Supabase (Postgres + Row Level Security) and was deployed on Netlify with test-gated CD.
+- **Status:** The classroom version was deployed and staff accounts were set up. Adoption is
+  paused pending district approval for a third-party tool that holds student data. This demo
+  is the public edition.
+
+### How it was built
+
+1. **Requirements from the people doing the work.** The design started from the classroom:
+   what gets recorded, who records it, and what it has to become. Several early assumptions
+   changed after talking to the teacher. A single shared login became per-person accounts once
+   it was clear each aide would use their own phone. ABC data became required by default for
+   new behaviors, because that is what an FBA needs.
+2. **A written spec before code.** The data model, privacy posture, offline behavior and
+   prompt format were agreed up front. The spec is in [`docs/design-spec.md`](docs/design-spec.md).
+3. **Iterating on real-phone testing.** Each round of hands-on testing turned into a short list
+   of fixes, shipped through the test-gated deploy pipeline.
+
+### Decisions and trade-offs
+
+- **Local-first over online-first.** Classrooms have dead zones, and a lost recording is worse
+  than a late one. Writes go to IndexedDB immediately and sync from an ordered outbox. The cost
+  was real complexity: ordering, retries, and telling "offline" apart from "rejected".
+- **One recording control per behavior.** An early version let a behavior be counted, timed
+  *and* rated, and one incident could end up logged twice. The fix was a recording model:
+  each behavior gets exactly one primary control (timer, then rating, then count), and one
+  incident is always one entry. Testing showed the extra flexibility wasn't worth the
+  confusion.
+- **Fair goal math.** A goal like "1 or fewer aggressions per day" was first averaged over
+  calendar days. Weekends, absences and untracked days then made a student look better or
+  worse than they were. Rates now average over days the student was actually observed.
+- **No LLM calls from the app.** The app builds a prompt package and the teacher pastes it
+  into whichever LLM their school allows. This keeps student data out of yet another vendor's
+  API, costs nothing, and leaves the final wording to a person.
+- **Pseudonyms and on-device photos.** Names never enter the system, so a leak exposes codes,
+  not children. Photos exist only on the device that took them, because a recognizable face is
+  the most sensitive thing the app could hold.
+
+### Challenges worth mentioning
+
+- **Security for student data.** A full audit of the classroom version led to several
+  hardening steps:
+  - Row Level Security behind an allowlist, so a valid login alone grants nothing.
+  - A server-stamped recorder identity that a client can't spoof.
+  - Sign-out that wipes the device.
+  - Sync that refuses to run without a live session. Otherwise an expired session could
+    silently drop queued deletes.
+  - A strict CSP.
+
+  Database rules are tested by running the real migrations in an in-process Postgres (PGlite).
+- **A bug only production could show.** Profile edits failed on the live database because
+  Postgres checks the INSERT policy even when an upsert resolves to an update. The failed write
+  then blocked that phone's sync queue. The fix shipped as a migration, along with a regression
+  test that reproduces the exact upsert.
+- **Updating an installed app.** A PWA keeps serving the old version until it relaunches. A
+  refresh banner now detects a waiting service worker and hands over cleanly mid-day without
+  losing a running timer.
+- **Making the demo honest.** Removing the backend meant the app had to do what Postgres used
+  to: cascading deletes now mirror the original foreign keys, and seeding runs exactly once. A
+  React StrictMode double-run first duplicated the sample classroom.
+
+### What I'd do next
+
+- Multi-classroom support: tenant isolation by team, admin roles and invite-based onboarding.
+- An offline-only mode for schools that can't approve a cloud tool. This demo is most of the
+  way there.
+- Native iOS/Android, most likely Capacitor first. The domain logic in `src/lib` is DOM-free,
+  so it can move to a native app unchanged.
 
 ## Run it
 
