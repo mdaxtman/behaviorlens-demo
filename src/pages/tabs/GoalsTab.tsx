@@ -1,6 +1,6 @@
 import { uuid } from '../../lib/id';
-import { Link } from 'react-router-dom';
-import { manageNewHref } from '../../lib/links';
+import { useState } from 'react';
+import GoalForm from '../../components/GoalForm';
 import { goalCurrent, lastNDays, dayKey } from '../../lib/analytics';
 import { getDeviceId } from '../../lib/prefs';
 import { useData } from '../../lib/store';
@@ -10,6 +10,7 @@ export default function GoalsTab({ student }: { student: Student }) {
   const { goals, goal_entries, events, activeSession, save } = useData();
   const mine = goals.filter(g => g.student_id === student.id && g.active)
     .sort((a, b) => a.title.localeCompare(b.title));
+  const [editing, setEditing] = useState<Goal | 'new' | null>(null);
   const range = lastNDays(7);
   const today = dayKey(new Date().toISOString());
 
@@ -31,14 +32,24 @@ export default function GoalsTab({ student }: { student: Student }) {
     await save('goal_entries', entry);
   }
 
+  // Opens in place: adding or changing a goal never leaves the student's page.
+  const form = editing && (
+    <GoalForm goal={editing === 'new' ? null : editing} studentId={student.id}
+      onClose={() => setEditing(null)} />
+  );
+
   if (mine.length === 0) {
     return (
-      <p className="py-8 text-center text-slate-500">
-        No goals yet —{' '}
-        <Link to={manageNewHref('goals', student.id)} className="font-semibold text-indigo-600">
-          add one for {student.code}
-        </Link>.
-      </p>
+      <div className="space-y-4 py-8 text-center">
+        <p className="text-slate-500">
+          No goals for {student.code} yet. A goal tracks progress toward an IEP target.
+        </p>
+        <button onClick={() => setEditing('new')}
+          className="min-h-12 rounded-xl bg-indigo-600 px-5 font-semibold text-white">
+          Add a goal for {student.code}
+        </button>
+        {form}
+      </div>
     );
   }
 
@@ -53,7 +64,7 @@ export default function GoalsTab({ student }: { student: Student }) {
         return (
           <div key={g.id} className="space-y-2 rounded-2xl bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-2">
-              <div>
+              <div className="min-w-0">
                 <div className="font-semibold">{g.title}</div>
                 <div className="text-sm text-slate-500">
                   Last 7 days: {cur.label}
@@ -65,6 +76,10 @@ export default function GoalsTab({ student }: { student: Student }) {
                   )}
                 </div>
               </div>
+              <button onClick={() => setEditing(g)} aria-label={`Edit goal: ${g.title}`}
+                className="-mr-1 -mt-2 min-h-11 shrink-0 px-2 text-sm font-semibold text-indigo-600">
+                Edit
+              </button>
             </div>
             {g.mode === 'direct' && (
               <div className="flex items-center gap-3">
@@ -80,10 +95,11 @@ export default function GoalsTab({ student }: { student: Student }) {
           </div>
         );
       })}
-      <Link to={manageNewHref('goals', student.id)}
-        className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 text-sm font-semibold text-slate-500">
+      <button onClick={() => setEditing('new')}
+        className="flex min-h-11 w-full items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 text-sm font-semibold text-slate-500">
         + Add goal for {student.code}
-      </Link>
+      </button>
+      {form}
     </div>
   );
 }

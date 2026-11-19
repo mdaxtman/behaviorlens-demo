@@ -41,9 +41,10 @@ export default function SessionBanner() {
               className="min-h-9 rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white">End</button>
           </div>
         ) : (
-          <div className="mx-auto max-w-3xl">
+          <div className="mx-auto flex max-w-3xl items-center gap-3">
             <button onClick={() => setStarting(true)}
-              className="min-h-9 text-sm font-semibold text-indigo-700">▶ Start session</button>
+              className="min-h-9 shrink-0 text-sm font-semibold text-indigo-700">▶ Start session</button>
+            <span className="truncate text-xs text-indigo-500">Optional: tags entries with the activity</span>
           </div>
         )}
       </div>
@@ -77,6 +78,10 @@ function StartForm({ onClose }: { onClose: () => void }) {
       <form onSubmit={submit} onClick={e => e.stopPropagation()}
         className="w-full max-w-md space-y-3 rounded-t-2xl bg-white p-5 sm:rounded-2xl">
         <h3 className="text-lg font-bold">Start session</h3>
+        <p className="text-sm text-slate-500">
+          While a session runs, everything you record is tagged with its activity, so the charts can
+          compare, say, Math with Recess. You can record without one.
+        </p>
         <label className="block text-sm text-slate-500">Activity
           <input required autoFocus value={activity} onChange={e => setActivity(e.target.value)}
             placeholder="e.g. Math, Recess" list="past-activities"
@@ -85,6 +90,7 @@ function StartForm({ onClose }: { onClose: () => void }) {
         <datalist id="past-activities">
           {pastActivities.map(a => <option key={a} value={a} />)}
         </datalist>
+        {settings.length > 0 && <div className="text-sm text-slate-500">Where <span className="text-slate-400">(optional)</span></div>}
         <div className="flex flex-wrap gap-2">
           {settings.map(p => (
             <button key={p.id} type="button"

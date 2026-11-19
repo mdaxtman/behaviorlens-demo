@@ -1,10 +1,11 @@
 import { uuid } from '../../lib/id';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { manageLogHref, manageNewHref } from '../../lib/links';
+import { backState, manageLogHref, studentHref } from '../../lib/links';
 import { selectEvents } from '../../lib/eventLog';
 import EventForm from '../../components/EventForm';
 import EventList from '../../components/EventList';
+import { StudentBehaviorsSheet } from '../../components/BehaviorSheets';
 import { useData } from '../../lib/store';
 import { elapsedSeconds, getTimer, restoreTimer, startTimer, stopTimer } from '../../lib/timers';
 import { captureAfterTrigger, needsCaptureSheet, primaryTrigger } from '../../lib/recording';
@@ -28,6 +29,7 @@ export default function RecordTab({ student }: { student: Student }) {
   const [draft, setDraft] = useState<CaptureDraft | null>(null);
   const [lastEvent, setLastEvent] = useState<BehaviorEvent | null>(null);
   const [editingEvent, setEditingEvent] = useState<BehaviorEvent | null>(null);
+  const [managing, setManaging] = useState(false);
   const [, setTick] = useState(0);
 
   // 1s tick keeps running-timer labels current.
@@ -83,12 +85,16 @@ export default function RecordTab({ student }: { student: Student }) {
 
   if (mine.length === 0) {
     return (
-      <p className="py-8 text-center text-slate-500">
-        No behaviors set up yet —{' '}
-        <Link to={manageNewHref('behaviors', student.id)} className="font-semibold text-indigo-600">
-          add one for {student.code}
-        </Link>.
-      </p>
+      <div className="space-y-4 py-8 text-center">
+        <p className="text-slate-500">
+          Nothing to record for {student.code} yet. Choose the behaviors you want to track.
+        </p>
+        <button onClick={() => setManaging(true)}
+          className="min-h-12 rounded-xl bg-indigo-600 px-5 font-semibold text-white">
+          Add behaviors for {student.code}
+        </button>
+        {managing && <StudentBehaviorsSheet student={student} onClose={() => setManaging(false)} />}
+      </div>
     );
   }
 
@@ -152,10 +158,12 @@ export default function RecordTab({ student }: { student: Student }) {
         );
       })}
 
-      <Link to={manageNewHref('behaviors', student.id)}
-        className="flex min-h-11 items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 text-sm font-semibold text-slate-500">
-        + Add behavior for {student.code}
-      </Link>
+      {/* Opens in place: adding or changing a behavior never leaves the student's page. */}
+      <button onClick={() => setManaging(true)}
+        className="flex min-h-11 w-full items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 text-sm font-semibold text-slate-500">
+        + Add or edit behaviors for {student.code}
+      </button>
+      {managing && <StudentBehaviorsSheet student={student} onClose={() => setManaging(false)} />}
 
       {/* Fix an errant entry right where it was recorded: tap it -> Delete (or edit). */}
       {(() => {
@@ -165,7 +173,8 @@ export default function RecordTab({ student }: { student: Student }) {
           <section className="space-y-2 pt-2">
             <div className="flex items-baseline justify-between">
               <h3 className="font-semibold">Recent entries</h3>
-              <Link to={manageLogHref(student.id)} className="text-sm font-semibold text-indigo-600">
+              <Link to={manageLogHref(student.id)} state={backState(studentHref(student.id), student.code)}
+                className="text-sm font-semibold text-indigo-600">
                 Full log for {student.code} →
               </Link>
             </div>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
 import { DataProvider } from '../lib/store';
 import SessionBanner from './SessionBanner';
 
@@ -30,6 +30,17 @@ function DemoBadge() {
 }
 
 function Chrome() {
+  const { pathname } = useLocation();
+  const navType = useNavigationType();
+  // A new page starts at its top instead of inheriting the last page's scroll position.
+  // Back/Forward (POP) is left alone so the browser can return to where the user was.
+  useEffect(() => {
+    if (navType !== 'POP') window.scrollTo(0, 0);
+  }, [pathname, navType]);
+  // A student's page is part of Students, so that tab stays lit there too.
+  const onStudents = pathname === '/' || pathname.startsWith('/student/');
+  const tab = (on: boolean) =>
+    `min-h-11 flex-1 py-3 text-center text-sm font-medium ${on ? 'text-indigo-600' : 'text-slate-500'}`;
   return (
     <div className="min-h-dvh bg-slate-50 pb-20">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur">
@@ -40,13 +51,11 @@ function Chrome() {
       <main className="mx-auto max-w-3xl p-4">
         <Outlet />
       </main>
-      <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
-        <NavLink to="/" end className={({ isActive }) =>
-          `min-h-11 flex-1 py-3 text-center text-sm font-medium ${isActive ? 'text-indigo-600' : 'text-slate-500'}`}>
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
+        <NavLink to="/" aria-current={onStudents ? 'page' : undefined} className={tab(onStudents)}>
           Students
         </NavLink>
-        <NavLink to="/manage" className={({ isActive }) =>
-          `min-h-11 flex-1 py-3 text-center text-sm font-medium ${isActive ? 'text-indigo-600' : 'text-slate-500'}`}>
+        <NavLink to="/manage" className={({ isActive }) => tab(isActive)}>
           Manage
         </NavLink>
       </nav>

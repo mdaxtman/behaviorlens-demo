@@ -32,12 +32,16 @@ export default function Avatar({ student, size = 56 }: { student: Student; size?
   const url = usePhotoUrl(student.id);
   if (url) {
     return <img src={url} alt={student.code} style={{ width: size, height: size }}
-      className="rounded-full object-cover" />;
+      className="shrink-0 rounded-full object-cover" />;
   }
+  // A four-letter code is unreadable in a small circle; there it is an initial beside the code.
+  const small = size < 32;
   return (
     <div style={{ width: size, height: size, backgroundColor: student.color }}
-      className="flex items-center justify-center rounded-full font-bold text-white">
-      <span style={{ fontSize: size / 3.2 }}>{student.code}</span>
+      className="flex shrink-0 items-center justify-center rounded-full font-bold text-white">
+      <span aria-hidden={small} style={{ fontSize: small ? size / 2 : size / 3.2 }}>
+        {small ? student.code.slice(0, 1).toUpperCase() : student.code}
+      </span>
     </div>
   );
 }

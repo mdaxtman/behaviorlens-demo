@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { fromLocalInput, toLocalInput } from '../lib/datetime';
+import { DeleteRow } from './Sheet';
 import { useData } from '../lib/store';
 import type { AbcPreset, BehaviorEvent } from '../lib/types';
 
@@ -54,7 +55,7 @@ export default function EventForm({ event, onClose }: { event: BehaviorEvent; on
     <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
       <form onSubmit={submit} onClick={e => e.stopPropagation()}
         className="max-h-[90dvh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-2xl bg-white p-5 sm:rounded-2xl">
-        <h3 className="text-lg font-bold">Edit event</h3>
+        <h3 className="text-lg font-bold">Edit entry{behavior && <span className="font-normal text-slate-400"> · {behavior.name}</span>}</h3>
         <label className="block text-sm text-slate-500">When
           <input type="datetime-local" required value={occurredAt} onChange={e => setOccurredAt(e.target.value)}
             className="mt-1 block w-full min-h-11 rounded-xl border border-slate-300 p-3" />
@@ -118,12 +119,11 @@ export default function EventForm({ event, onClose }: { event: BehaviorEvent; on
         <div className="flex gap-2">
           <button type="submit" className="min-h-11 flex-1 rounded-xl bg-indigo-600 p-3 font-semibold text-white">Save</button>
           <button type="button" onClick={onClose} className="min-h-11 rounded-xl border border-slate-300 px-4">Cancel</button>
-          <button type="button"
-            onClick={() => {
-              if (window.confirm('Delete this event?')) void removeRow('events', event.id).then(onClose);
-            }}
-            className="min-h-11 rounded-xl border border-red-200 px-4 text-red-600">Delete</button>
         </div>
+        <DeleteRow label="Delete this entry…"
+          onDelete={() => {
+            if (window.confirm('Delete this entry?')) void removeRow('events', event.id).then(onClose);
+          }} />
       </form>
     </div>
   );

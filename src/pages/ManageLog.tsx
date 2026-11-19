@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import EventForm from '../components/EventForm';
 import EventList from '../components/EventList';
+import PageHeader from '../components/PageHeader';
+import { DeleteRow } from '../components/Sheet';
 import { fromLocalInput, toLocalInput } from '../lib/datetime';
 import { selectEvents } from '../lib/eventLog';
 import { useData } from '../lib/store';
@@ -12,6 +14,8 @@ export default function ManageLog() {
   const { students, events, sessions, activeSession, removeRow } = useData();
   // ?student=<id> filters to one student (deep link from a student's page; survives refresh).
   const [params, setParams] = useSearchParams();
+  // Carried through filter changes so the back link still returns to where the user came from.
+  const { state } = useLocation();
   const studentId = params.get('student');
   const student = students.find(s => s.id === studentId) ?? null;
   const [editingEvent, setEditingEvent] = useState<BehaviorEvent | null>(null);
@@ -23,11 +27,13 @@ export default function ManageLog() {
 
   return (
     <div className="space-y-6">
+      <PageHeader back={{ to: '/manage', label: 'Manage' }} title="Data log" />
       <section className="space-y-2">
-        <h2 className="text-xl font-bold">Recent events{student && ` · ${student.code}`}</h2>
+        <h3 className="font-semibold">Recent events{student && ` · ${student.code}`}</h3>
+        <p className="text-sm text-slate-500">Tap an entry to correct or delete it.</p>
         <label className="block text-sm text-slate-500">Student
           <select value={studentId ?? ''}
-            onChange={e => setParams(e.target.value ? { student: e.target.value } : {}, { replace: true })}
+            onChange={e => setParams(e.target.value ? { student: e.target.value } : {}, { replace: true, state })}
             className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 bg-white p-3 text-slate-900">
             <option value="">All students</option>
             {[...students].sort((a, b) => a.code.localeCompare(b.code))
@@ -41,7 +47,8 @@ export default function ManageLog() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-xl font-bold">Sessions</h2>
+        <h3 className="font-semibold">Sessions</h3>
+        {recentSessions.length === 0 && <p className="text-slate-500">No sessions yet.</p>}
         <ul className="space-y-1">
           {recentSessions.map(s => (
             <li key={s.id}>
@@ -110,9 +117,8 @@ function SessionForm({ session, onClose, onDelete }:
         <div className="flex gap-2">
           <button type="submit" className="min-h-11 flex-1 rounded-xl bg-indigo-600 p-3 font-semibold text-white">Save</button>
           <button type="button" onClick={onClose} className="min-h-11 rounded-xl border border-slate-300 px-4">Cancel</button>
-          <button type="button" onClick={onDelete}
-            className="min-h-11 rounded-xl border border-red-200 px-4 text-red-600">Delete</button>
         </div>
+        <DeleteRow label="Delete session…" onDelete={onDelete} />
       </form>
     </div>
   );
