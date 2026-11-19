@@ -1,12 +1,17 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { fromLocalInput, toLocalInput } from '../lib/datetime';
-import { DeleteRow } from './Sheet';
+import Select, { type SelectOption } from './Select';
+import Sheet, { DeleteRow } from './Sheet';
+import { btnPrimary, btnSecondary, field } from './styles';
+import { useSheet } from './useSheet';
 import { useData } from '../lib/store';
 import type { AbcPreset, BehaviorEvent } from '../lib/types';
 
 /** Edit/delete sheet for one recorded event. Shared by the Data log and a student's Record tab. */
 export default function EventForm({ event, onClose }: { event: BehaviorEvent; onClose: () => void }) {
   const { abc_presets, behaviors, save, removeRow } = useData();
+  const { close, bind } = useSheet(onClose);
+  const formId = useId();
   const behavior = behaviors.find(b => b.id === event.behavior_id);
   const [occurredAt, setOccurredAt] = useState(toLocalInput(event.occurred_at));
   const [count, setCount] = useState(String(event.count));
@@ -27,9 +32,13 @@ export default function EventForm({ event, onClose }: { event: BehaviorEvent; on
     || event.antecedent != null || event.consequence != null;
   const showDuration = (behavior?.track_duration ?? false) || event.duration_seconds != null;
 
-  const options = (kind: AbcPreset['kind']) =>
-    abc_presets.filter(p => p.kind === kind && p.active)
-      .sort((a, b) => a.sort_order - b.sort_order);
+  /** "None", the active presets, and the event's own value if that preset has since been removed. */
+  const options = (kind: AbcPreset['kind'], current: string): SelectOption[] => {
+    const labels = abc_presets.filter(p => p.kind === kind && p.active)
+      .sort((a, b) => a.sort_order - b.sort_order).map(p => p.label);
+    if (current && !labels.includes(current)) labels.push(current);
+    return [{ value: '', label: 'None' }, ...labels.map(l => ({ value: l, label: l }))];
+  };
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -48,30 +57,36 @@ export default function EventForm({ event, onClose }: { event: BehaviorEvent; on
       note: note.trim() || null,
     };
     await save('events', updated);
-    onClose();
+    close();
   }
 
+  const small = 'w-16 min-h-11 rounded-xl border border-slate-300 p-2 text-center';
   return (
-    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
-      <form onSubmit={submit} onClick={e => e.stopPropagation()}
-        className="max-h-[90dvh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-2xl bg-white p-5 sm:rounded-2xl">
-        <h3 className="text-lg font-bold">Edit entry{behavior && <span className="font-normal text-slate-400"> · {behavior.name}</span>}</h3>
+    <Sheet {...bind}
+      title={<>Edit entry{behavior && <span className="font-normal text-slate-400"> · {behavior.name}</span>}</>}
+      footer={
+        <div className="flex gap-2">
+          <button type="submit" form={formId} className={`${btnPrimary} flex-1`}>Save</button>
+          <button type="button" onClick={close} className={btnSecondary}>Cancel</button>
+        </div>
+      }>
+      <form id={formId} onSubmit={e => void submit(e)} className="space-y-3">
         <label className="block text-sm text-slate-500">When
           <input type="datetime-local" required value={occurredAt} onChange={e => setOccurredAt(e.target.value)}
-            className="mt-1 block w-full min-h-11 rounded-xl border border-slate-300 p-3" />
+            className={`${field} block`} />
         </label>
         <label className="block text-sm text-slate-500">Count
-          <input type="number" min={1} value={count} onChange={e => setCount(e.target.value)}
-            className="mt-1 block w-24 min-h-11 rounded-xl border border-slate-300 p-3" />
+          <input type="number" inputMode="numeric" min={1} value={count} onChange={e => setCount(e.target.value)}
+            className="mt-1 block w-24 min-h-11 rounded-xl border border-slate-300 p-3 text-slate-900" />
         </label>
         {showDuration && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-500">Duration:</span>
-            <input aria-label="Duration minutes" type="number" min={0} value={durMin} onChange={e => setDurMin(e.target.value)}
-              placeholder="0" className="w-16 min-h-11 rounded-xl border border-slate-300 p-2 text-center" />
+            <input aria-label="Duration minutes" type="number" inputMode="numeric" min={0} value={durMin}
+              onChange={e => setDurMin(e.target.value)} placeholder="0" className={small} />
             <span className="text-sm text-slate-400">min</span>
-            <input aria-label="Duration seconds" type="number" min={0} max={59} value={durSec} onChange={e => setDurSec(e.target.value)}
-              placeholder="0" className="w-16 min-h-11 rounded-xl border border-slate-300 p-2 text-center" />
+            <input aria-label="Duration seconds" type="number" inputMode="numeric" min={0} max={59} value={durSec}
+              onChange={e => setDurSec(e.target.value)} placeholder="0" className={small} />
             <span className="text-sm text-slate-400">sec</span>
           </div>
         )}
@@ -79,8 +94,8 @@ export default function EventForm({ event, onClose }: { event: BehaviorEvent; on
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-500">Intensity:</span>
             {[1, 2, 3, 4, 5].map(r => (
-              <button key={r} type="button" onClick={() => setRating(rating === r ? null : r)}
-                className={`h-11 w-11 rounded-full border text-sm font-semibold ${
+              <button key={r} type="button" onClick={() => setRating(rating === r ? null : r)} aria-pressed={rating === r}
+                className={`h-11 w-11 rounded-full border text-sm font-semibold transition active:scale-90 ${
                   rating === r ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-300 text-slate-600'}`}>
                 {r}
               </button>
@@ -89,42 +104,19 @@ export default function EventForm({ event, onClose }: { event: BehaviorEvent; on
         )}
         {showAbc && (
           <>
-            <label className="block text-sm text-slate-500">Antecedent
-              <select value={antecedent} onChange={e => setAntecedent(e.target.value)}
-                className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 bg-white p-3 text-slate-900">
-                <option value="">None</option>
-                {options('antecedent').map(p => <option key={p.id} value={p.label}>{p.label}</option>)}
-              </select>
-            </label>
-            <label className="block text-sm text-slate-500">Consequence
-              <select value={consequence} onChange={e => setConsequence(e.target.value)}
-                className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 bg-white p-3 text-slate-900">
-                <option value="">None</option>
-                {options('consequence').map(p => <option key={p.id} value={p.label}>{p.label}</option>)}
-              </select>
-            </label>
-            <label className="block text-sm text-slate-500">Setting
-              <select value={setting} onChange={e => setSetting(e.target.value)}
-                className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 bg-white p-3 text-slate-900">
-                <option value="">None</option>
-                {options('setting').map(p => <option key={p.id} value={p.label}>{p.label}</option>)}
-              </select>
-            </label>
+            <Select label="Antecedent" value={antecedent} options={options('antecedent', antecedent)} onChange={setAntecedent} />
+            <Select label="Consequence" value={consequence} options={options('consequence', consequence)} onChange={setConsequence} />
+            <Select label="Setting" value={setting} options={options('setting', setting)} onChange={setSetting} />
           </>
         )}
         <label className="block text-sm text-slate-500">Note <span className="text-slate-400">(optional)</span>
-          <input value={note} onChange={e => setNote(e.target.value)}
-            className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 p-3 text-slate-900" />
+          <input value={note} onChange={e => setNote(e.target.value)} className={field} />
         </label>
-        <div className="flex gap-2">
-          <button type="submit" className="min-h-11 flex-1 rounded-xl bg-indigo-600 p-3 font-semibold text-white">Save</button>
-          <button type="button" onClick={onClose} className="min-h-11 rounded-xl border border-slate-300 px-4">Cancel</button>
-        </div>
         <DeleteRow label="Delete this entry…"
           onDelete={() => {
-            if (window.confirm('Delete this entry?')) void removeRow('events', event.id).then(onClose);
+            if (window.confirm('Delete this entry?')) void removeRow('events', event.id).then(close);
           }} />
       </form>
-    </div>
+    </Sheet>
   );
 }

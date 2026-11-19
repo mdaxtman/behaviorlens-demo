@@ -27,7 +27,7 @@ export default function EventList({ events, onSelect, hideStudent = false }:
           <li key={e.id}>
             {header && <div className="pt-2 text-xs font-semibold text-slate-400">{header}</div>}
             <button onClick={() => onSelect(e)}
-              className="flex w-full items-center justify-between rounded-xl bg-white p-3 text-left text-sm shadow-sm">
+              className="flex w-full items-center justify-between rounded-xl bg-white p-3 text-left text-sm shadow-sm transition active:bg-slate-50">
               <span>
                 {!hideStudent && <><span className="font-semibold">{student?.code ?? '??'}</span> · </>}
                     <span className={hideStudent ? 'font-semibold' : ''}>{behavior?.name ?? '?'}</span>
@@ -36,7 +36,7 @@ export default function EventList({ events, onSelect, hideStudent = false }:
                 {e.antecedent && ` · ${e.antecedent} → ${e.consequence ?? '?'}`}
                 {recorderLabel(e) && ` · by ${recorderLabel(e)}`}
               </span>
-              <span className="text-xs text-slate-400">
+              <span className="ml-3 shrink-0 whitespace-nowrap text-xs text-slate-400">
                 {new Date(e.occurred_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </span>
             </button>

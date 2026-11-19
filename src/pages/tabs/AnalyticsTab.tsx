@@ -9,6 +9,7 @@ import {
   dayOfWeekCounts, directGoalSeries, goalCurrent, heatmapHours, hourDayHeatmap,
   inRange, lastNDays, linkedGoalSeries, trendDirection,
 } from '../../lib/analytics';
+import Select from '../../components/Select';
 import { useData } from '../../lib/store';
 import type { Student } from '../../lib/types';
 
@@ -57,11 +58,9 @@ export default function AnalyticsTab({ student }: { student: Student }) {
             {r}d
           </button>
         ))}
-        <select aria-label="Filter by behavior" value={behaviorId} onChange={e => setBehaviorId(e.target.value)}
-          className="min-h-9 flex-1 rounded-xl border border-slate-300 bg-white px-2 text-sm">
-          <option value="all">All behaviors</option>
-          {myBehaviors.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
+        <Select ariaLabel="Filter by behavior" size="sm" className="min-w-0 flex-1" value={behaviorId}
+          onChange={setBehaviorId}
+          options={[{ value: 'all', label: 'All behaviors' }, ...myBehaviors.map(b => ({ value: b.id, label: b.name }))]} />
         <button onClick={() => void exportPng()}
           className="min-h-9 rounded-xl border border-slate-300 px-3 text-sm">PNG ⬇</button>
       </div>

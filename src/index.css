@@ -1,1 +1,85 @@
 @import 'tailwindcss';
+
+/* Keeps the layout from shifting sideways when a sheet hides the page scrollbar. */
+html { scrollbar-gutter: stable; }
+
+/* ---- Focus and touch ------------------------------------------------------------------ */
+/* Unlayered on purpose: these must win over utility classes such as border-slate-300. */
+button:not(:disabled), [role='tab'], summary, label:has(input[type='checkbox']) { cursor: pointer; }
+button, a, label, [role='tab'] { -webkit-tap-highlight-color: transparent; }
+
+:focus-visible { outline: 2px solid var(--color-indigo-500); outline-offset: 2px; }
+
+input:not([type='checkbox'], [type='radio'], [type='file']), textarea, select {
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:not([type='checkbox'], [type='radio'], [type='file']):focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--color-indigo-500);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-indigo-500) 22%, transparent);
+}
+input[type='checkbox'] {
+  width: 1.25rem; height: 1.25rem; flex-shrink: 0;
+  accent-color: var(--color-indigo-600);
+}
+
+/* ---- Bottom sheet (components/Sheet.tsx) ----------------------------------------------- */
+.sheet-backdrop { opacity: 0; transition: opacity 0.22s ease-out; }
+[data-open='true'] > .sheet-backdrop { opacity: 1; transition-duration: 0.3s; }
+
+/* Phone: slides up from the bottom edge, and leaves faster than it arrives. */
+.sheet-panel {
+  transform: translateY(100%);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 1, 1);
+  will-change: transform;
+}
+[data-open='true'] > .sheet-panel {
+  transform: translateY(0);
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* While a finger is dragging it, the sheet follows exactly, with no easing. */
+.sheet-panel[data-dragging='true'] { transition: none; }
+
+/* Wider screens: a centered dialog that fades and settles into place. */
+@media (min-width: 40rem) {
+  .sheet-panel {
+    transform: translateY(16px) scale(0.97);
+    opacity: 0;
+    transition: transform 0.18s ease-in, opacity 0.18s ease-in;
+  }
+  [data-open='true'] > .sheet-panel {
+    transform: none;
+    opacity: 1;
+    transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease-out;
+  }
+}
+
+/* ---- Small motion ---------------------------------------------------------------------- */
+/* Opacity only: a transform here would re-anchor position:fixed children (the undo toast). */
+@keyframes fade-in { from { opacity: 0; } }
+.page-in { animation: fade-in 0.2s ease-out; }
+
+@keyframes toast-in { from { opacity: 0; transform: translateY(16px); } }
+.toast-in { animation: toast-in 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
+
+@keyframes slide-down { from { opacity: 0; transform: translateY(-6px); } }
+.slide-down { animation: slide-down 0.2s ease-out; }
+
+/* A count that just went up. */
+@keyframes count-pop { 40% { transform: scale(1.5); color: var(--color-indigo-600); } }
+.count-pop { display: inline-block; animation: count-pop 0.35s ease-out; }
+
+/* A running timer keeps a slow pulse so it is noticed from across the room. */
+@keyframes timer-ring {
+  from { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-rose-600) 55%, transparent); }
+  to { box-shadow: 0 0 0 12px transparent; }
+}
+.timer-running { animation: timer-ring 1.5s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -50,13 +50,7 @@ export default function StudentPage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <BackLink to="/" label="Students" />
-        <button onClick={() => setEditing(true)}
-          className="min-h-11 pl-3 text-sm font-semibold text-indigo-600">
-          Edit {student.code}
-        </button>
-      </div>
+      <BackLink to="/" label="Students" />
 
       {/* One tap to move between students mid-session, staying on the same tab. Replaces history
           so Back always returns to the Students screen, not through every student visited. */}
@@ -66,7 +60,7 @@ export default function StudentPage() {
           return (
             <Link key={s.id} ref={current ? currentRef : undefined} replace
               to={studentHref(s.id, tab.toLowerCase())} aria-current={current ? 'page' : undefined}
-              className={`relative flex w-16 shrink-0 flex-col items-center gap-1 rounded-xl py-1.5 ${
+              className={`relative flex w-16 shrink-0 flex-col items-center gap-1 rounded-xl py-1.5 transition ${
                 current ? 'bg-white shadow-sm' : 'opacity-55'}`}>
               <span className={`rounded-full ${current ? 'ring-2 ring-indigo-600 ring-offset-2' : ''}`}>
                 <Avatar student={s} size={44} />
@@ -82,7 +76,16 @@ export default function StudentPage() {
           );
         })}
       </nav>
-      <h2 className="sr-only">{student.code}</h2>
+      <div className="flex min-h-9 items-center justify-between gap-3">
+        <h2 className="text-xl font-bold">
+          {student.code}
+          {student.grade && <span className="ml-2 text-sm font-normal text-slate-500">Grade {student.grade}</span>}
+        </h2>
+        <button onClick={() => setEditing(true)}
+          className="-mr-2 min-h-11 rounded-lg px-2 text-sm font-semibold text-indigo-600 transition active:bg-indigo-50">
+          Edit
+        </button>
+      </div>
       {!student.active && (
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {student.code} is inactive and hidden from the Students screen.
@@ -92,21 +95,24 @@ export default function StudentPage() {
       <div role="tablist" className="flex rounded-xl bg-slate-200/70 p-1">
         {TABS.map(t => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-            className={`min-h-10 flex-1 rounded-lg text-sm font-medium ${
+            className={`min-h-10 flex-1 rounded-lg text-sm font-medium transition ${
               tab === t ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600'}`}>
             {t}
           </button>
         ))}
       </div>
-      {/* Keyed by student: switching students must not carry over an open sheet or undo toast. */}
-      {tab === 'Record' && <RecordTab key={student.id} student={student} />}
-      {tab === 'Goals' && <GoalsTab key={student.id} student={student} />}
-      {tab === 'Analytics' && (
-        <Suspense fallback={<div className="py-16 text-center text-slate-400">Loading charts…</div>}>
-          <AnalyticsTab key={student.id} student={student} />
-        </Suspense>
-      )}
-      {tab === 'Generate' && <GenerateTab key={student.id} student={student} />}
+      {/* Keyed by student and tab: switching either starts clean (no open sheet or undo toast
+          carried over) and fades the new content in. */}
+      <div key={`${student.id}:${tab}`} role="tabpanel" className="page-in">
+        {tab === 'Record' && <RecordTab student={student} />}
+        {tab === 'Goals' && <GoalsTab student={student} />}
+        {tab === 'Analytics' && (
+          <Suspense fallback={<div className="py-16 text-center text-slate-400">Loading charts…</div>}>
+            <AnalyticsTab student={student} />
+          </Suspense>
+        )}
+        {tab === 'Generate' && <GenerateTab student={student} />}
+      </div>
 
       {editing && (
         <StudentForm student={student} onClose={() => setEditing(false)}

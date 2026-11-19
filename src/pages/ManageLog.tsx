@@ -1,9 +1,13 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import EventForm from '../components/EventForm';
 import EventList from '../components/EventList';
 import PageHeader from '../components/PageHeader';
-import { DeleteRow } from '../components/Sheet';
+import Avatar from '../components/Avatar';
+import Select from '../components/Select';
+import Sheet, { DeleteRow } from '../components/Sheet';
+import { btnPrimary, btnSecondary, field } from '../components/styles';
+import { useSheet } from '../components/useSheet';
 import { fromLocalInput, toLocalInput } from '../lib/datetime';
 import { selectEvents } from '../lib/eventLog';
 import { useData } from '../lib/store';
@@ -31,15 +35,13 @@ export default function ManageLog() {
       <section className="space-y-2">
         <h3 className="font-semibold">Recent events{student && ` · ${student.code}`}</h3>
         <p className="text-sm text-slate-500">Tap an entry to correct or delete it.</p>
-        <label className="block text-sm text-slate-500">Student
-          <select value={studentId ?? ''}
-            onChange={e => setParams(e.target.value ? { student: e.target.value } : {}, { replace: true, state })}
-            className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 bg-white p-3 text-slate-900">
-            <option value="">All students</option>
-            {[...students].sort((a, b) => a.code.localeCompare(b.code))
-              .map(s => <option key={s.id} value={s.id}>{s.code}</option>)}
-          </select>
-        </label>
+        <Select label="Student" value={studentId ?? ''}
+          onChange={v => setParams(v ? { student: v } : {}, { replace: true, state })}
+          options={[
+            { value: '', label: 'All students' },
+            ...[...students].sort((a, b) => a.code.localeCompare(b.code))
+              .map(s => ({ value: s.id, label: s.code, icon: <Avatar student={s} size={28} /> })),
+          ]} />
         {recentEvents.length === 0 && (
           <p className="text-slate-500">{student ? `No events recorded for ${student.code} yet.` : 'No events recorded yet.'}</p>
         )}
@@ -81,6 +83,8 @@ export default function ManageLog() {
 function SessionForm({ session, onClose, onDelete }:
   { session: Session; onClose: () => void; onDelete: () => void }) {
   const { save } = useData();
+  const { close, bind } = useSheet(onClose);
+  const formId = useId();
   const [activity, setActivity] = useState(session.activity);
   const [startedAt, setStartedAt] = useState(toLocalInput(session.started_at));
   const [endedAt, setEndedAt] = useState(session.ended_at ? toLocalInput(session.ended_at) : '');
@@ -94,32 +98,31 @@ function SessionForm({ session, onClose, onDelete }:
       ended_at: fromLocalInput(endedAt),
     };
     await save('sessions', updated);
-    onClose();
+    close();
   }
 
   return (
-    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
-      <form onSubmit={submit} onClick={e => e.stopPropagation()}
-        className="w-full max-w-md space-y-3 rounded-t-2xl bg-white p-5 sm:rounded-2xl">
-        <h3 className="text-lg font-bold">Edit session</h3>
+    <Sheet {...bind} title="Edit session"
+      footer={
+        <div className="flex gap-2">
+          <button type="submit" form={formId} className={`${btnPrimary} flex-1`}>Save</button>
+          <button type="button" onClick={close} className={btnSecondary}>Cancel</button>
+        </div>
+      }>
+      <form id={formId} onSubmit={e => void submit(e)} className="space-y-3">
         <label className="block text-sm text-slate-500">Activity
-          <input required value={activity} onChange={e => setActivity(e.target.value)}
-            className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 p-3 text-slate-900" />
+          <input required value={activity} onChange={e => setActivity(e.target.value)} className={field} />
         </label>
         <label className="block text-sm text-slate-500">Started
           <input type="datetime-local" required value={startedAt} onChange={e => setStartedAt(e.target.value)}
-            className="mt-1 block w-full min-h-11 rounded-xl border border-slate-300 p-3" />
+            className={`${field} block`} />
         </label>
         <label className="block text-sm text-slate-500">Ended (blank = still running)
           <input type="datetime-local" value={endedAt} onChange={e => setEndedAt(e.target.value)}
-            className="mt-1 block w-full min-h-11 rounded-xl border border-slate-300 p-3" />
+            className={`${field} block`} />
         </label>
-        <div className="flex gap-2">
-          <button type="submit" className="min-h-11 flex-1 rounded-xl bg-indigo-600 p-3 font-semibold text-white">Save</button>
-          <button type="button" onClick={onClose} className="min-h-11 rounded-xl border border-slate-300 px-4">Cancel</button>
-        </div>
         <DeleteRow label="Delete session…" onDelete={onDelete} />
       </form>
-    </div>
+    </Sheet>
   );
 }

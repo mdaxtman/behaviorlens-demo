@@ -1,7 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import Avatar from './Avatar';
 import Sheet, { DeleteRow } from './Sheet';
+import { btnPrimary, btnSecondary, choice, field } from './styles';
+import { useSheet } from './useSheet';
 import {
   bankKey, buildBank, copyForStudent, DEFAULT_SETTINGS, planSharedSave, planStudentSave,
   settingsOf, settingsSummary, starterSuggestions, studentOptions,
@@ -17,7 +19,8 @@ const clean = (s: BehaviorSettings): BehaviorSettings =>
 
 function Toggle({ label, value, set }: { label: string; value: boolean; set: (v: boolean) => void }) {
   return (
-    <label className="flex min-h-11 items-center justify-between rounded-xl border border-slate-200 px-3 text-sm">
+    <label className={`flex min-h-11 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm transition ${
+      value ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-200'}`}>
       {label}
       <input type="checkbox" checked={value} onChange={e => set(e.target.checked)} />
     </label>
@@ -31,18 +34,17 @@ function SettingsFields({ value, onChange }: { value: BehaviorSettings; onChange
     <>
       <label className="block text-sm text-slate-500">Behavior name
         <input required value={value.name} onChange={e => set({ name: e.target.value })} placeholder="e.g. Aggression"
-          className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 p-3 text-slate-900" />
+          className={field} />
       </label>
       <label className="block text-sm text-slate-500">Operational definition <span className="text-slate-400">(optional)</span>
         <textarea value={value.description ?? ''} onChange={e => set({ description: e.target.value })} rows={2}
-          className="mt-1 w-full rounded-xl border border-slate-300 p-3 text-slate-900" />
+          className={field} />
         <span className="mt-1 block text-xs text-slate-400">What counts as this behavior, so everyone records it the same way.</span>
       </label>
       <div className="flex gap-2">
         {(['challenging', 'skill'] as const).map(c => (
           <button key={c} type="button" onClick={() => set({ category: c })} aria-pressed={value.category === c}
-            className={`min-h-11 flex-1 rounded-xl border p-2 text-sm font-medium ${
-              value.category === c ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-300'}`}>
+            className={`${choice(value.category === c)} flex-1`}>
             {c === 'challenging' ? 'Challenging' : 'Skill / replacement'}
           </button>
         ))}
@@ -72,6 +74,8 @@ export function SharedBehaviorSheet({ entry, prefill, preselect, onClose }: {
   onClose: () => void;
 }) {
   const { students, behaviors, save, removeRow } = useData();
+  const { close, bind } = useSheet(onClose);
+  const formId = useId();
   const active = students.filter(s => s.active).sort(byCode);
   const [draft, setDraft] = useState<BehaviorSettings>(entry?.settings ?? prefill ?? DEFAULT_SETTINGS);
   const [picked, setPicked] = useState<string[]>(
@@ -93,7 +97,7 @@ export function SharedBehaviorSheet({ entry, prefill, preselect, onClose }: {
       now: new Date().toISOString(), newId: uuid,
     });
     for (const row of rows) await save('behaviors', row);
-    onClose();
+    close();
   }
 
   async function deleteForEveryone() {
@@ -104,12 +108,20 @@ export function SharedBehaviorSheet({ entry, prefill, preselect, onClose }: {
       + "including every recording of it? This can't be undone.\n\n"
       + 'To stop tracking it and keep the data, untick the students instead.')) return;
     for (const m of entry.members) await removeRow('behaviors', m.behavior.id);
-    onClose();
+    close();
   }
 
   return (
-    <Sheet title={entry ? `Edit ${entry.name}` : 'New behavior'} onClose={onClose}>
-      <form onSubmit={e => void submit(e)} className="space-y-3">
+    <Sheet {...bind} title={entry ? `Edit ${entry.name}` : 'New behavior'}
+      footer={
+        <div className="flex gap-2">
+          <button type="submit" form={formId} disabled={!!clash || needsStudent} className={`${btnPrimary} flex-1`}>
+            {entry ? 'Save for these students' : 'Save'}
+          </button>
+          <button type="button" onClick={close} className={btnSecondary}>Cancel</button>
+        </div>
+      }>
+      <form id={formId} onSubmit={e => void submit(e)} className="space-y-3">
         <SettingsFields value={draft} onChange={setDraft} />
         {clash && (
           <p className="text-sm text-red-600">
@@ -136,7 +148,8 @@ export function SharedBehaviorSheet({ entry, prefill, preselect, onClose }: {
           {active.map(s => {
             const m = memberOf(s.id);
             return (
-              <label key={s.id} className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm">
+              <label key={s.id} className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 text-sm transition ${
+                picked.includes(s.id) ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-200'}`}>
                 <input type="checkbox" checked={picked.includes(s.id)}
                   onChange={e => setPicked(p => e.target.checked ? [...p, s.id] : p.filter(i => i !== s.id))} />
                 <Avatar student={s} size={28} />
@@ -167,13 +180,6 @@ export function SharedBehaviorSheet({ entry, prefill, preselect, onClose }: {
           </label>
         )}
 
-        <div className="flex gap-2">
-          <button type="submit" disabled={!!clash || needsStudent}
-            className="min-h-11 flex-1 rounded-xl bg-indigo-600 p-3 font-semibold text-white disabled:opacity-40">
-            {entry ? 'Save for these students' : 'Save'}
-          </button>
-          <button type="button" onClick={onClose} className="min-h-11 rounded-xl border border-slate-300 px-4">Cancel</button>
-        </div>
         {entry && <DeleteRow label="Delete for everyone…" onDelete={() => void deleteForEveryone()} />}
       </form>
     </Sheet>
@@ -183,6 +189,8 @@ export function SharedBehaviorSheet({ entry, prefill, preselect, onClose }: {
 /** One student's copy of a behavior, with the option to carry the edit to others who have it. */
 export function StudentBehaviorSheet({ behavior, onClose }: { behavior: Behavior; onClose: () => void }) {
   const { students, behaviors, save, removeRow } = useData();
+  const { close, bind } = useSheet(onClose);
+  const formId = useId();
   const student = students.find(s => s.id === behavior.student_id);
   const [draft, setDraft] = useState<BehaviorSettings>(settingsOf(behavior));
   const [active, setActive] = useState(behavior.active);
@@ -204,12 +212,18 @@ export function StudentBehaviorSheet({ behavior, onClose }: { behavior: Behavior
     const mine: Behavior = { ...behavior, ...clean(draft), active };
     const rows = planStudentSave(mine, others.filter(o => also.includes(o.behavior.id)).map(o => o.behavior));
     for (const row of rows) await save('behaviors', row);
-    onClose();
+    close();
   }
 
   return (
-    <Sheet title={`${behavior.name} for ${code}`} onClose={onClose}>
-      <form onSubmit={e => void submit(e)} className="space-y-3">
+    <Sheet {...bind} title={`${behavior.name} for ${code}`}
+      footer={
+        <div className="flex gap-2">
+          <button type="submit" form={formId} disabled={!!clash} className={`${btnPrimary} flex-1`}>Save</button>
+          <button type="button" onClick={close} className={btnSecondary}>Cancel</button>
+        </div>
+      }>
+      <form id={formId} onSubmit={e => void submit(e)} className="space-y-3">
         <p className="text-sm text-slate-500">Changes here apply to {code} only, unless you tick others below.</p>
         <SettingsFields value={draft} onChange={setDraft} />
         {clash && <p className="text-sm text-red-600">{code} already has a behavior called "{clash.name}".</p>}
@@ -219,7 +233,8 @@ export function StudentBehaviorSheet({ behavior, onClose }: { behavior: Behavior
           <fieldset className="space-y-1">
             <legend className="text-sm font-semibold text-slate-600">Also update for</legend>
             {others.map(o => (
-              <label key={o.behavior.id} className="flex min-h-11 items-center gap-3 rounded-xl border border-slate-200 px-3 text-sm">
+              <label key={o.behavior.id} className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 text-sm transition ${
+                also.includes(o.behavior.id) ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-200'}`}>
                 <input type="checkbox" checked={also.includes(o.behavior.id)}
                   onChange={e => setAlso(a => e.target.checked ? [...a, o.behavior.id] : a.filter(i => i !== o.behavior.id))} />
                 <Avatar student={o.student} size={28} />
@@ -229,15 +244,10 @@ export function StudentBehaviorSheet({ behavior, onClose }: { behavior: Behavior
           </fieldset>
         )}
 
-        <div className="flex gap-2">
-          <button type="submit" disabled={!!clash}
-            className="min-h-11 flex-1 rounded-xl bg-indigo-600 p-3 font-semibold text-white disabled:opacity-40">Save</button>
-          <button type="button" onClick={onClose} className="min-h-11 rounded-xl border border-slate-300 px-4">Cancel</button>
-        </div>
         <DeleteRow label={`Delete for ${code}…`}
           onDelete={() => {
             if (window.confirm(`Delete "${behavior.name}" for ${code}, including every recording of it? This can't be undone.`)) {
-              void removeRow('behaviors', behavior.id).then(onClose);
+              void removeRow('behaviors', behavior.id).then(close);
             }
           }} />
       </form>
@@ -251,19 +261,14 @@ export function StudentBehaviorSheet({ behavior, onClose }: { behavior: Behavior
  */
 export function StudentBehaviorsSheet({ student, onClose }: { student: Student; onClose: () => void }) {
   const { students, behaviors, save } = useData();
+  const { close, bind } = useSheet(onClose);
+  // A sheet opened from this one sits on top of it, so closing it returns here.
   const [view, setView] = useState<'list' | 'new' | Behavior>('list');
   // Include this student even if inactive, so their own behaviors still show.
   const roster = students.filter(s => s.active || s.id === student.id);
   const bank = buildBank(behaviors, roster);
   const { tracking, available } = studentOptions(bank, student.id);
   const starters = starterSuggestions(bank);
-
-  if (view === 'new') {
-    return <SharedBehaviorSheet entry={null} preselect={[student.id]} onClose={() => setView('list')} />;
-  }
-  if (view !== 'list') {
-    return <StudentBehaviorSheet behavior={view} onClose={() => setView('list')} />;
-  }
 
   const add = (settings: BehaviorSettings) =>
     void save('behaviors', copyForStudent(settings, student.id, new Date().toISOString(), uuid()));
@@ -272,15 +277,16 @@ export function StudentBehaviorsSheet({ student, onClose }: { student: Student; 
     void save('behaviors', row);
   };
   const row = 'flex min-h-14 items-center gap-3 rounded-xl border border-slate-200 px-3 py-2';
-  const addBtn = 'min-h-9 shrink-0 rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white';
+  const addBtn = 'min-h-9 shrink-0 rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white transition active:scale-95';
 
   return (
-    <Sheet title={`Behaviors for ${student.code}`} onClose={onClose}>
+    <Sheet {...bind} title={`Behaviors for ${student.code}`}
+      footer={<button onClick={close} className={`${btnPrimary} w-full`}>Done</button>}>
       <section className="space-y-1">
         <h4 className="text-sm font-semibold text-slate-600">Tracking now</h4>
         {tracking.length === 0 && <p className="text-sm text-slate-500">Nothing yet. Add a behavior below.</p>}
         {tracking.map(b => (
-          <button key={b.id} onClick={() => setView(b)} className={`${row} w-full text-left`}>
+          <button key={b.id} onClick={() => setView(b)} className={`${row} w-full text-left transition active:bg-slate-50`}>
             <span className="min-w-0 flex-1">
               <span className="block truncate font-semibold">{b.name}</span>
               <span className="block text-xs text-slate-500">{settingsSummary(b)}</span>
@@ -333,8 +339,12 @@ export function StudentBehaviorsSheet({ student, onClose }: { student: Student; 
         className="min-h-11 w-full rounded-xl border-2 border-dashed border-slate-300 text-sm font-semibold text-slate-600">
         + Create a new behavior
       </button>
-      <button onClick={onClose}
-        className="min-h-11 w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white">Done</button>
+      {view === 'new' && (
+        <SharedBehaviorSheet entry={null} preselect={[student.id]} onClose={() => setView('list')} />
+      )}
+      {view !== 'list' && view !== 'new' && (
+        <StudentBehaviorSheet behavior={view} onClose={() => setView('list')} />
+      )}
     </Sheet>
   );
 }

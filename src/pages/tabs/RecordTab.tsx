@@ -1,11 +1,15 @@
 import { uuid } from '../../lib/id';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { backState, manageLogHref, studentHref } from '../../lib/links';
 import { selectEvents } from '../../lib/eventLog';
 import EventForm from '../../components/EventForm';
 import EventList from '../../components/EventList';
 import { StudentBehaviorsSheet } from '../../components/BehaviorSheets';
+import Sheet from '../../components/Sheet';
+import { btnPrimary, btnSecondary, chip, field } from '../../components/styles';
+import { useSheet } from '../../components/useSheet';
+import { buzz } from '../../lib/haptics';
 import { useData } from '../../lib/store';
 import { elapsedSeconds, getTimer, restoreTimer, startTimer, stopTimer } from '../../lib/timers';
 import { captureAfterTrigger, needsCaptureSheet, primaryTrigger } from '../../lib/recording';
@@ -19,6 +23,17 @@ interface CaptureFields {
 function fmtSecs(secs: number): string {
   const m = Math.floor(secs / 60), s = secs % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** Today's count for a behavior; it pops when it goes up, confirming the tap registered. */
+function TodayCount({ n }: { n: number }) {
+  const last = useRef(n);
+  const [bumps, setBumps] = useState(0);
+  useEffect(() => {
+    if (n > last.current) setBumps(b => b + 1);
+    last.current = n;
+  }, [n]);
+  return <span key={bumps} className={bumps > 0 ? 'count-pop font-semibold' : undefined}>{n}</span>;
 }
 
 export default function RecordTab({ student }: { student: Student }) {
@@ -72,6 +87,7 @@ export default function RecordTab({ student }: { student: Student }) {
       return;
     }
     const ev = makeEvent(behavior, extra);
+    buzz();
     await save('events', ev);
     setLastEvent(ev);
   }
@@ -112,7 +128,7 @@ export default function RecordTab({ student }: { student: Student }) {
                   {b.category === 'skill' && <span className="ml-1 text-xs text-emerald-600">skill</span>}
                 </div>
                 <div className="text-xs text-slate-400">
-                  {todayCount(b.id)} today
+                  <TodayCount n={todayCount(b.id)} /> today
                   {b.track_duration && ' · timed'}
                   {b.track_rating && ' · intensity'}
                   {b.requires_abc && ' · ABC'}
@@ -130,11 +146,12 @@ export default function RecordTab({ student }: { student: Student }) {
                       const secs = stopTimer(b.id);
                       if (secs != null) void log(b, { duration_seconds: secs });
                     }}
-                    className="h-14 rounded-2xl bg-rose-600 px-4 font-bold tabular-nums text-white transition active:scale-90">
+                    className="timer-running h-14 rounded-2xl bg-rose-600 px-4 font-bold tabular-nums text-white transition active:scale-90">
                     ■ {fmtSecs(elapsedSeconds(timer))}
                   </button>
                 ) : (
-                  <button onClick={() => { startTimer(b.id, student.id); setTick(t => t + 1); }}
+                  <button aria-label={`Start timing ${b.name}`}
+                    onClick={() => { buzz(); startTimer(b.id, student.id); setTick(t => t + 1); }}
                     className="h-14 rounded-2xl bg-emerald-600 px-4 text-xl font-bold text-white transition active:scale-90">
                     ▶
                   </button>
@@ -199,7 +216,8 @@ export default function RecordTab({ student }: { student: Student }) {
       )}
 
       {lastEvent && (
-        <div className="fixed inset-x-4 bottom-20 z-30 mx-auto flex max-w-md items-center justify-between rounded-xl bg-slate-900 px-4 py-3 text-white shadow-lg">
+        <div key={lastEvent.id} role="status"
+          className="toast-in fixed inset-x-4 bottom-20 z-30 mx-auto flex max-w-md items-center justify-between rounded-xl bg-slate-900 px-4 py-3 text-white shadow-lg">
           <span className="text-sm">
             Logged {behaviors.find(b => b.id === lastEvent.behavior_id)?.name ?? 'event'}
             {lastEvent.duration_seconds != null && ` (${fmtSecs(lastEvent.duration_seconds)})`}
@@ -218,6 +236,9 @@ export default function RecordTab({ student }: { student: Student }) {
 function CaptureSheet({ draft, onCancel, onSave }:
   { draft: CaptureDraft; onCancel: () => void; onSave: (f: CaptureFields) => void }) {
   const { abc_presets } = useData();
+  // Set by Save; when the sheet has finished closing, this decides which callback runs.
+  const result = useRef<CaptureFields | null>(null);
+  const { close, bind } = useSheet(() => (result.current ? onSave(result.current) : onCancel()));
   const fields = captureAfterTrigger(draft.behavior);
   const [antecedent, setAntecedent] = useState<string | null>(null);
   const [consequence, setConsequence] = useState<string | null>(null);
@@ -230,7 +251,8 @@ function CaptureSheet({ draft, onCancel, onSave }:
   const quickSaveOnRating = fields.rating && !fields.abc;
 
   function finish(withRating: number | null) {
-    onSave({ antecedent, consequence, rating: withRating, note: note.trim() || null });
+    result.current = { antecedent, consequence, rating: withRating, note: note.trim() || null };
+    close();
   }
 
   const chips = (kind: AbcPreset['kind'], value: string | null, set: (v: string | null) => void) => (
@@ -238,10 +260,9 @@ function CaptureSheet({ draft, onCancel, onSave }:
       {abc_presets.filter(p => p.kind === kind && p.active)
         .sort((a, b) => a.sort_order - b.sort_order)
         .map(p => (
-          <button key={p.id} type="button"
+          <button key={p.id} type="button" aria-pressed={value === p.label}
             onClick={() => set(value === p.label ? null : p.label)}
-            className={`min-h-11 rounded-full border px-4 text-sm ${
-              value === p.label ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-300'}`}>
+            className={chip(value === p.label)}>
             {p.label}
           </button>
         ))}
@@ -249,52 +270,51 @@ function CaptureSheet({ draft, onCancel, onSave }:
   );
 
   return (
-    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onCancel}>
-      <div onClick={e => e.stopPropagation()}
-        className="max-h-[90dvh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-2xl bg-white p-5 sm:rounded-2xl">
-        <h3 className="text-lg font-bold">{draft.behavior.name}</h3>
-        {draft.duration_seconds != null && (
-          <p className="text-sm text-slate-500">
-            Duration <span className="font-semibold tabular-nums">{fmtSecs(draft.duration_seconds)}</span> — recorded on this entry.
-          </p>
-        )}
-        {fields.rating && (
-          <div>
-            <p className="text-sm font-semibold text-slate-500">
-              Intensity{quickSaveOnRating && <span className="font-normal text-slate-400"> (tap to save)</span>}
-            </p>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {[1, 2, 3, 4, 5].map(r => (
-                <button key={r} type="button"
-                  onClick={() => (quickSaveOnRating ? finish(r) : setRating(rating === r ? null : r))}
-                  className={`h-12 w-12 rounded-full border text-base font-semibold ${
-                    rating === r ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-300 text-slate-600'}`}>
-                  {r}
-                </button>
-              ))}
-            </div>
+    <Sheet {...bind} title={draft.behavior.name}
+      footer={
+        <>
+          {fields.abc && !canSave && (
+            <p className="text-xs text-slate-500">Pick what happened before and after to save.</p>
+          )}
+          <div className="flex gap-2">
+            <button disabled={!canSave} onClick={() => finish(rating)} className={`${btnPrimary} flex-1`}>Save</button>
+            <button onClick={close} className={btnSecondary}>Cancel</button>
           </div>
-        )}
-        {fields.abc && (
-          <>
-            <p className="text-sm font-semibold text-slate-500">What happened right before? (Antecedent)</p>
-            {chips('antecedent', antecedent, setAntecedent)}
-            <p className="text-sm font-semibold text-slate-500">What happened right after? (Consequence)</p>
-            {chips('consequence', consequence, setConsequence)}
-          </>
-        )}
-        <label className="block text-sm text-slate-500">Note <span className="text-slate-400">(optional)</span>
-          <input value={note} onChange={e => setNote(e.target.value)}
-            className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 p-3 text-slate-900" />
-        </label>
-        <div className="flex gap-2">
-          <button disabled={!canSave} onClick={() => finish(rating)}
-            className="min-h-11 flex-1 rounded-xl bg-indigo-600 p-3 font-semibold text-white disabled:opacity-40">
-            Save
-          </button>
-          <button onClick={onCancel} className="min-h-11 rounded-xl border border-slate-300 px-4">Cancel</button>
+        </>
+      }>
+      {draft.duration_seconds != null && (
+        <p className="text-sm text-slate-500">
+          Duration <span className="font-semibold tabular-nums">{fmtSecs(draft.duration_seconds)}</span> — recorded on this entry.
+        </p>
+      )}
+      {fields.rating && (
+        <div>
+          <p className="text-sm font-semibold text-slate-500">
+            Intensity{quickSaveOnRating && <span className="font-normal text-slate-400"> (tap to save)</span>}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {[1, 2, 3, 4, 5].map(r => (
+              <button key={r} type="button" aria-pressed={rating === r}
+                onClick={() => (quickSaveOnRating ? finish(r) : setRating(rating === r ? null : r))}
+                className={`h-12 w-12 rounded-full border text-base font-semibold transition active:scale-90 ${
+                  rating === r ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-300 text-slate-600'}`}>
+                {r}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+      {fields.abc && (
+        <>
+          <p className="text-sm font-semibold text-slate-500">What happened right before? (Antecedent)</p>
+          {chips('antecedent', antecedent, setAntecedent)}
+          <p className="text-sm font-semibold text-slate-500">What happened right after? (Consequence)</p>
+          {chips('consequence', consequence, setConsequence)}
+        </>
+      )}
+      <label className="block text-sm text-slate-500">Note <span className="text-slate-400">(optional)</span>
+        <input value={note} onChange={e => setNote(e.target.value)} className={field} />
+      </label>
+    </Sheet>
   );
 }

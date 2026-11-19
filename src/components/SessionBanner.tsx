@@ -1,5 +1,8 @@
 import { uuid } from '../lib/id';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
+import Sheet from './Sheet';
+import { btnPrimary, btnSecondary, chip, field } from './styles';
+import { useSheet } from './useSheet';
 import { useData } from '../lib/store';
 import type { Session } from '../lib/types';
 
@@ -56,9 +59,14 @@ export default function SessionBanner() {
 
 function StartForm({ onClose }: { onClose: () => void }) {
   const { sessions, abc_presets, save } = useData();
+  const { close, bind } = useSheet(onClose);
+  const formId = useId();
   const [activity, setActivity] = useState('');
   const [setting, setSetting] = useState<string | null>(null);
-  const pastActivities = [...new Set(sessions.map(s => s.activity))].sort();
+  // Most recent first: the activity about to start is usually one from the last few days.
+  const pastActivities = [...new Set(
+    [...sessions].sort((a, b) => b.started_at.localeCompare(a.started_at)).map(s => s.activity),
+  )].slice(0, 8);
   const settings = abc_presets.filter(p => p.kind === 'setting' && p.active)
     .sort((a, b) => a.sort_order - b.sort_order);
 
@@ -70,48 +78,54 @@ function StartForm({ onClose }: { onClose: () => void }) {
       id: uuid(), activity: activity.trim(), setting,
       started_at: now, ended_at: null, note: null, created_at: now,
     } as Session);
-    onClose();
+    close();
   }
 
   return (
-    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
-      <form onSubmit={submit} onClick={e => e.stopPropagation()}
-        className="w-full max-w-md space-y-3 rounded-t-2xl bg-white p-5 sm:rounded-2xl">
-        <h3 className="text-lg font-bold">Start session</h3>
+    <Sheet {...bind} title="Start session"
+      footer={
+        <div className="flex gap-2">
+          <button type="submit" form={formId} className={`${btnPrimary} flex-1`}>Start</button>
+          <button type="button" onClick={close} className={btnSecondary}>Cancel</button>
+        </div>
+      }>
+      <form id={formId} onSubmit={e => void submit(e)} className="space-y-3">
         <p className="text-sm text-slate-500">
           While a session runs, everything you record is tagged with its activity, so the charts can
           compare, say, Math with Recess. You can record without one.
         </p>
         <label className="block text-sm text-slate-500">Activity
           <input required autoFocus value={activity} onChange={e => setActivity(e.target.value)}
-            placeholder="e.g. Math, Recess" list="past-activities"
-            className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 p-3 text-slate-900" />
+            placeholder="e.g. Math, Recess" className={field} />
         </label>
-        <datalist id="past-activities">
-          {pastActivities.map(a => <option key={a} value={a} />)}
-        </datalist>
+        {pastActivities.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {pastActivities.map(a => (
+              <button key={a} type="button" onClick={() => setActivity(a)} aria-pressed={activity === a}
+                className={chip(activity === a)}>
+                {a}
+              </button>
+            ))}
+          </div>
+        )}
         {settings.length > 0 && <div className="text-sm text-slate-500">Where <span className="text-slate-400">(optional)</span></div>}
         <div className="flex flex-wrap gap-2">
           {settings.map(p => (
-            <button key={p.id} type="button"
+            <button key={p.id} type="button" aria-pressed={setting === p.label}
               onClick={() => setSetting(setting === p.label ? null : p.label)}
-              className={`min-h-11 rounded-full border px-4 text-sm ${
-                setting === p.label ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-300'}`}>
+              className={chip(setting === p.label)}>
               {p.label}
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
-          <button type="submit" className="min-h-11 flex-1 rounded-xl bg-indigo-600 p-3 font-semibold text-white">Start</button>
-          <button type="button" onClick={onClose} className="min-h-11 rounded-xl border border-slate-300 px-4">Cancel</button>
-        </div>
       </form>
-    </div>
+    </Sheet>
   );
 }
 
 function SessionSummary({ session, onClose }: { session: Session; onClose: () => void }) {
   const { students, behaviors, events, goal_entries, goals } = useData();
+  const { close, bind } = useSheet(onClose);
   const sessionEvents = events.filter(e => e.session_id === session.id);
   const sessionTrials = goal_entries.filter(g => g.session_id === session.id);
   const studentIds = [...new Set([
@@ -120,10 +134,8 @@ function SessionSummary({ session, onClose }: { session: Session; onClose: () =>
   ])].filter(Boolean);
 
   return (
-    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()}
-        className="max-h-[85dvh] w-full max-w-md space-y-3 overflow-y-auto rounded-t-2xl bg-white p-5 sm:rounded-2xl">
-        <h3 className="text-lg font-bold">Session summary — {session.activity}</h3>
+    <Sheet {...bind} title={`Session summary — ${session.activity}`}
+      footer={<button onClick={close} className={`${btnPrimary} w-full`}>Done</button>}>
         {studentIds.length === 0 && <p className="text-slate-500">No data recorded this session.</p>}
         {studentIds.map(sid => {
           const student = students.find(s => s.id === sid);
@@ -155,9 +167,6 @@ function SessionSummary({ session, onClose }: { session: Session; onClose: () =>
             </div>
           );
         })}
-        <button onClick={onClose}
-          className="w-full min-h-11 rounded-xl bg-indigo-600 p-3 font-semibold text-white">Done</button>
-      </div>
-    </div>
+    </Sheet>
   );
 }

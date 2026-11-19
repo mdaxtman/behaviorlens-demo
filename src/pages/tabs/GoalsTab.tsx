@@ -2,6 +2,7 @@ import { uuid } from '../../lib/id';
 import { useState } from 'react';
 import GoalForm from '../../components/GoalForm';
 import { goalCurrent, lastNDays, dayKey } from '../../lib/analytics';
+import { buzz } from '../../lib/haptics';
 import { getDeviceId } from '../../lib/prefs';
 import { useData } from '../../lib/store';
 import type { Goal, GoalEntry, Student } from '../../lib/types';
@@ -18,6 +19,7 @@ export default function GoalsTab({ student }: { student: Student }) {
   // on device_id too (not just goal_id + day) means two devices editing the same goal on the
   // same day each get their own row instead of last-write-wins clobbering the other's taps.
   async function trial(goal: Goal, success: boolean) {
+    buzz();
     const deviceId = getDeviceId();
     const existing = goal_entries.find(e => e.goal_id === goal.id
       && dayKey(e.occurred_at) === today && e.device_id === deviceId);
@@ -87,7 +89,8 @@ export default function GoalsTab({ student }: { student: Student }) {
                   className="h-14 flex-1 rounded-2xl bg-emerald-600 text-2xl font-bold text-white transition active:scale-90">✓</button>
                 <button onClick={() => void trial(g, false)}
                   className="h-14 flex-1 rounded-2xl bg-rose-600 text-2xl font-bold text-white transition active:scale-90">✗</button>
-                <span className="w-16 text-center font-bold tabular-nums text-slate-600">
+                <span key={todayEntry?.opportunities ?? 0}
+                  className={`w-16 text-center font-bold tabular-nums text-slate-600 ${todayEntry ? 'count-pop' : ''}`}>
                   {todayEntry ? `${todayEntry.successes}/${todayEntry.opportunities}` : '0/0'}
                 </span>
               </div>

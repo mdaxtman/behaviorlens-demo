@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Avatar from '../components/Avatar';
 import GoalForm from '../components/GoalForm';
+import Select from '../components/Select';
 import PageHeader from '../components/PageHeader';
 import { useData } from '../lib/store';
 import { useStudentQuery } from '../components/useStudentQuery';
@@ -32,12 +34,8 @@ export default function ManageGoals() {
           <Link to="/manage/students" className="font-semibold text-indigo-600">Add a student first</Link>
         </p>
       ) : (
-        <label className="block text-sm text-slate-500">Student
-          <select value={studentId} onChange={e => setStudentId(e.target.value)}
-            className="mt-1 w-full min-h-11 rounded-xl border border-slate-300 bg-white p-3 text-slate-900">
-            {active.map(s => <option key={s.id} value={s.id}>{s.code}</option>)}
-          </select>
-        </label>
+        <Select label="Student" value={studentId} onChange={setStudentId}
+          options={active.map(s => ({ value: s.id, label: s.code, icon: <Avatar student={s} size={28} /> }))} />
       )}
       {student && mine.length === 0 && (
         <p className="py-4 text-center text-slate-500">No goals for {student.code} yet. Tap Add to write one.</p>

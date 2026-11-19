@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigationType } from 'react-router-dom';
+import { HeaderBackContext } from '../lib/headerBack';
+import type { BackTarget } from '../lib/links';
 import { DataProvider } from '../lib/store';
 import SessionBanner from './SessionBanner';
 
@@ -40,26 +42,45 @@ function Chrome() {
   // A student's page is part of Students, so that tab stays lit there too.
   const onStudents = pathname === '/' || pathname.startsWith('/student/');
   const tab = (on: boolean) =>
-    `min-h-11 flex-1 py-3 text-center text-sm font-medium ${on ? 'text-indigo-600' : 'text-slate-500'}`;
+    `min-h-11 flex-1 py-3 text-center text-sm font-medium transition ${on ? 'text-indigo-600' : 'text-slate-500'}`;
+  // A sub-page's back link, drawn here so it stays on screen while the page scrolls.
+  const [back, setBack] = useState<BackTarget | null>(null);
+  // Moving between students is the same screen, so it does not replay the page fade.
+  const screen = pathname.startsWith('/student/') ? '/student' : pathname;
   return (
-    <div className="min-h-dvh bg-slate-50 pb-20">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur">
-        <NavLink to="/" className="font-bold text-indigo-600">BehaviorLens</NavLink>
-        <DemoBadge />
-      </header>
-      <SessionBanner />
-      <main className="mx-auto max-w-3xl p-4">
-        <Outlet />
-      </main>
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
-        <NavLink to="/" aria-current={onStudents ? 'page' : undefined} className={tab(onStudents)}>
-          Students
-        </NavLink>
-        <NavLink to="/manage" className={({ isActive }) => tab(isActive)}>
-          Manage
-        </NavLink>
-      </nav>
-    </div>
+    <HeaderBackContext.Provider value={setBack}>
+      <div className="min-h-dvh bg-slate-50 pb-20">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur">
+          {back ? (
+            <Link to={back.to}
+              className="-ml-2 flex min-h-11 items-center gap-0.5 rounded-lg pl-1 pr-3 font-semibold text-indigo-600 transition active:bg-indigo-50">
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor"
+                strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5l-5 5 5 5" />
+              </svg>
+              {back.label}
+            </Link>
+          ) : (
+            <NavLink to="/" className="font-bold text-indigo-600">BehaviorLens</NavLink>
+          )}
+          <DemoBadge />
+        </header>
+        <SessionBanner />
+        <main className="mx-auto max-w-3xl p-4">
+          <div key={screen} className="page-in">
+            <Outlet />
+          </div>
+        </main>
+        <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-10 flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
+          <NavLink to="/" aria-current={onStudents ? 'page' : undefined} className={tab(onStudents)}>
+            Students
+          </NavLink>
+          <NavLink to="/manage" className={({ isActive }) => tab(isActive)}>
+            Manage
+          </NavLink>
+        </nav>
+      </div>
+    </HeaderBackContext.Provider>
   );
 }
 
