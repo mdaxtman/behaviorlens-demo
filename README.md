@@ -3,6 +3,8 @@
 A mobile-first app for special education teachers and paraprofessionals. It records classroom
 behavior data in two taps, then turns it into charts and IEP-ready writing prompts.
 
+**Live demo: [behaviorlens-demo.netlify.app](https://behaviorlens-demo.netlify.app)** (best on a phone; installable as an app).
+
 **This is a demo.** It opens on a made-up classroom of four students with six weeks of data.
 Everything you add or change is stored in your browser only: there is no server, no login, and
 it works offline.
@@ -189,6 +191,7 @@ No environment variables are needed.
 
 ## Deploy
 
-`netlify.toml` builds with `npm ci && npm test -- --run && npm run build` and publishes `dist/`,
-so a failing test blocks the deploy. Any static host works; the SPA fallback is in
+The live demo deploys from `main` on Netlify. `netlify.toml` builds with
+`npm ci && npm test -- --run && npm run build` and publishes `dist/`, so a failing test blocks
+the deploy. Any static host works; the SPA fallback is in
 `public/_redirects`.
